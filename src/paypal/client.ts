@@ -20,6 +20,8 @@ export class PayPalError extends Error {
 
 type RequestOpts = {
   json?: unknown;
+  /** A pre-serialised JSON body, sent byte for byte (used to embed the raw webhook event). */
+  rawJson?: string;
   form?: FormData;
   headers?: Record<string, string>;
   /** Idempotency key sent as PayPal-Request-Id on writes. */
@@ -80,7 +82,10 @@ export class PayPalClient {
   async request<T = unknown>(method: string, path: string, opts: RequestOpts = {}): Promise<PayPalResult<T>> {
     const headers: Record<string, string> = { Authorization: `Bearer ${await this.accessToken()}`, ...opts.headers };
     let body: BodyInit | undefined;
-    if (opts.json !== undefined) {
+    if (opts.rawJson !== undefined) {
+      headers["Content-Type"] = "application/json";
+      body = opts.rawJson;
+    } else if (opts.json !== undefined) {
       headers["Content-Type"] = "application/json";
       body = JSON.stringify(opts.json);
     } else if (opts.form) {
@@ -102,7 +107,7 @@ export class PayPalClient {
         method,
         path,
         headers: Object.fromEntries(Object.entries(headers).map(([k, v]) => [k, /authorization|assertion/i.test(k) ? "<redacted>" : v])),
-        body: opts.json ?? (opts.form ? describeForm(opts.form) : undefined),
+        body: opts.json ?? (opts.rawJson ? "<raw json>" : opts.form ? describeForm(opts.form) : undefined),
       };
       const issue = (data as { details?: { issue?: string }[]; message?: string; name?: string } | null)?.details?.[0]?.issue;
       const msg = issue ?? (data as { name?: string } | null)?.name ?? `HTTP ${res.status}`;
@@ -184,23 +189,23 @@ export class PayPalClient {
     const h = (n: string) => headers.get(n) ?? "";
     const required = ["paypal-auth-algo", "paypal-cert-url", "paypal-transmission-id", "paypal-transmission-sig", "paypal-transmission-time"];
     if (required.some((n) => !headers.get(n))) return { verified: false, debugId: null };
-    let event: unknown;
     try {
-      event = JSON.parse(rawBody);
+      JSON.parse(rawBody); // must at least be valid JSON
     } catch {
       return { verified: false, debugId: null };
     }
-    const r = await this.request<{ verification_status?: string }>("POST", "/v1/notifications/verify-webhook-signature", {
-      json: {
-        auth_algo: h("paypal-auth-algo"),
-        cert_url: h("paypal-cert-url"),
-        transmission_id: h("paypal-transmission-id"),
-        transmission_sig: h("paypal-transmission-sig"),
-        transmission_time: h("paypal-transmission-time"),
-        webhook_id: webhookId,
-        webhook_event: event,
-      },
-    });
+    // Embed the event exactly as received. Parsing and re-serialising it changes the bytes PayPal signed
+    // (key order, number formatting, escaping) and makes verification fail.
+    const fields = {
+      auth_algo: h("paypal-auth-algo"),
+      cert_url: h("paypal-cert-url"),
+      transmission_id: h("paypal-transmission-id"),
+      transmission_sig: h("paypal-transmission-sig"),
+      transmission_time: h("paypal-transmission-time"),
+      webhook_id: webhookId,
+    };
+    const rawJson = `${JSON.stringify(fields).slice(0, -1)},"webhook_event":${rawBody.trim()}}`;
+    const r = await this.request<{ verification_status?: string }>("POST", "/v1/notifications/verify-webhook-signature", { rawJson });
     return { verified: r.data.verification_status === "SUCCESS", debugId: r.debugId };
   }
 

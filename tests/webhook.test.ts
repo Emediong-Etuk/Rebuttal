@@ -69,3 +69,21 @@ describe("webhook intake", () => {
     expect(r).toMatchObject({ pooled: true });
   });
 });
+
+describe("verify-webhook-signature request", () => {
+  it("embeds the raw event bytes unchanged in the verification request", async () => {
+    const { PayPalClient } = await import("@/paypal/client");
+    const bodies: string[] = [];
+    const fetchImpl = (async (url: string, init: RequestInit) => {
+      if (String(url).endsWith("/v1/oauth2/token")) return new Response(JSON.stringify({ access_token: "t", expires_in: 3600 }), { status: 200 });
+      bodies.push(String(init.body));
+      return new Response(JSON.stringify({ verification_status: "SUCCESS" }), { status: 200, headers: { "paypal-debug-id": "d" } });
+    }) as unknown as typeof fetch;
+    const client = new PayPalClient({ baseUrl: "https://x", clientId: "a", clientSecret: "b", fetchImpl });
+    const raw = '{"id":"WH-1","amount":1.10,"z":"\\u00e9","a":1}';
+    const r = await client.verifyWebhookSignature(headers(), raw, "WHID");
+    expect(r.verified).toBe(true);
+    expect(bodies[0]).toContain(`"webhook_event":${raw}}`);
+    expect(JSON.parse(bodies[0]!).webhook_id).toBe("WHID");
+  });
+});
