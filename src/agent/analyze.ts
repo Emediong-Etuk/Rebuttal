@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { anthropic } from "@ai-sdk/anthropic";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { generateText, jsonSchema, Output, stepCountIs, tool, type LanguageModel } from "ai";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { analysisSchema, type Analysis, type FactRecord } from "./schema";
@@ -7,9 +8,29 @@ import type { FactStore } from "./facts";
 import { TOOL_ENDPOINTS, type ReadToolkit, type ReadToolName } from "./toolkit";
 
 export const DEFAULT_MODEL = "claude-opus-5-5";
+/** OpenRouter's name for a Claude model. Check openrouter.ai/models and set OPENROUTER_MODEL to the newest Claude. */
+export const DEFAULT_OPENROUTER_MODEL = "anthropic/claude-sonnet-4.5";
+
+export type ModelChoice = { provider: "anthropic" | "openrouter"; modelId: string };
+
+/** Claude direct from Anthropic when ANTHROPIC_API_KEY is set; otherwise Claude through OpenRouter. */
+export function modelChoice(env: NodeJS.ProcessEnv = process.env): ModelChoice | null {
+  if (env.ANTHROPIC_API_KEY) return { provider: "anthropic", modelId: env.ANTHROPIC_MODEL || DEFAULT_MODEL };
+  if (env.OPENROUTER_API_KEY) return { provider: "openrouter", modelId: env.OPENROUTER_MODEL || DEFAULT_OPENROUTER_MODEL };
+  return null;
+}
 
 export function getModel(): LanguageModel {
-  return anthropic(process.env.ANTHROPIC_MODEL || DEFAULT_MODEL);
+  const choice = modelChoice();
+  if (!choice) throw new Error("No AI provider configured: set ANTHROPIC_API_KEY (or OPENROUTER_API_KEY).");
+  if (choice.provider === "anthropic") return anthropic(choice.modelId);
+  const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY, appName: "Rebuttal", appUrl: process.env.APP_URL });
+  return openrouter.chat(choice.modelId);
+}
+
+export function modelLabel(): string {
+  const c = modelChoice();
+  return c ? `Claude (${c.modelId}) via ${c.provider === "anthropic" ? "Anthropic API" : "OpenRouter"}, Vercel AI SDK` : "AI provider not configured";
 }
 
 export type AnalyzeInput = {

@@ -8,7 +8,7 @@ import { approvalUrl, issueApproval } from "@/lib/approvals";
 import { audit, timeline } from "@/lib/record";
 import { buildSellerMessage } from "@/notify/message";
 import { sendTelegram } from "@/notify/telegram";
-import { createClaudeAnalyzer, type Analyzer } from "./analyze";
+import { createClaudeAnalyzer, modelLabel, type Analyzer } from "./analyze";
 import { concedeCap, decisionFor, loadFacts } from "./executor";
 import { FactStore, investigate } from "./facts";
 import { groundCheck, type GroundCheckResult } from "./groundCheck";
@@ -126,7 +126,7 @@ export async function runPipeline(caseId: string, deps: PipelineDeps = {}) {
         actor: "model",
         title: `Verdict: ${ANALYSIS_SUMMARY(analysis)}`,
         body: analysis.reasoning_summary,
-        endpoint: `Claude (${modelId}) via Vercel AI SDK`,
+        endpoint: deps.analyzer ? `analyzer: ${modelId}` : `${modelLabel()} (served: ${modelId})`,
         detail: { attempt, analysis },
       },
       db,

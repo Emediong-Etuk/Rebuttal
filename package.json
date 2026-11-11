@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.102",
+    "@openrouter/ai-sdk-provider": "^3.1.0",
     "@paypal/agent-toolkit": "^1.11.0",
     "ai": "^7.0.169",
     "drizzle-orm": "^0.45.4",
