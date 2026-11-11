@@ -231,7 +231,7 @@ export class PayPalClient {
     return this.request<Record<string, unknown>>("GET", `/v2/payments/captures/${encodeURIComponent(id)}`, { template: "/v2/payments/captures/{id}" });
   }
 
-  addTracking(t: { transactionId: string; trackingNumber: string; carrier: string; status: "SHIPPED" | "DELIVERED"; shipmentDate: string }, requestId?: string) {
+  addTracking(t: { transactionId: string; trackingNumber: string; carrier: string; status: "SHIPPED" | "DELIVERED"; shipmentDate?: string }, requestId?: string) {
     return this.request<{ tracker_identifiers?: unknown[]; errors?: unknown[] }>("POST", "/v1/shipping/trackers-batch", {
       json: {
         trackers: [
@@ -240,12 +240,18 @@ export class PayPalClient {
             tracking_number: t.trackingNumber,
             status: t.status,
             carrier: t.carrier,
-            shipment_date: t.shipmentDate,
+            ...(t.shipmentDate ? { shipment_date: t.shipmentDate } : {}),
             notify_buyer: false,
           },
         ],
       },
       requestId,
+    });
+  }
+
+  listTrackers(transactionId: string) {
+    return this.request<{ trackers?: Array<Record<string, unknown>> }>("GET", `/v1/shipping/trackers?transaction_id=${encodeURIComponent(transactionId)}`, {
+      template: "/v1/shipping/trackers",
     });
   }
 

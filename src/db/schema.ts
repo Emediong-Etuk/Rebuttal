@@ -50,6 +50,9 @@ export const cases = pgTable("cases", {
   /** Incremented every time the pipeline produces a new draft; part of idempotency keys. */
   draftVersion: integer("draft_version").notNull().default(0),
   outcome: text("outcome"),
+  /** Pre-filed real sandbox disputes held for the public demo until a visitor claims one. */
+  pool: boolean("pool").notNull().default(false),
+  claimedAt: timestamp("claimed_at", { withTimezone: true }),
   lastReminderAt: timestamp("last_reminder_at", { withTimezone: true }),
   reminderCount: integer("reminder_count").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -159,6 +162,8 @@ export const settings = pgTable("settings", {
   id: text("id").primaryKey().default("default"),
   concedeCap: numeric("concede_cap", { precision: 12, scale: 2 }).notNull().default(sql`100`),
   telegramChatId: text("telegram_chat_id"),
+  /** When true, newly created disputes are held in the demo pool instead of being answered at once. */
+  holdNewDisputesForDemo: boolean("hold_new_disputes_for_demo").notNull().default(true),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
