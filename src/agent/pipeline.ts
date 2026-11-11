@@ -18,7 +18,7 @@ import { createReadOnlyToolkit, type ReadToolkit } from "./toolkit";
 
 export type PipelineDeps = {
   db?: DB;
-  paypal?: Pick<PayPalClient, "getDispute" | "getCapture" | "accessToken">;
+  paypal?: Pick<PayPalClient, "getDispute" | "getCapture" | "accessToken"> & Partial<Pick<PayPalClient, "getTracker">>;
   toolkit?: ReadToolkit;
   analyzer?: Analyzer;
   notify?: typeof sendTelegram;
@@ -74,9 +74,15 @@ export async function runPipeline(caseId: string, deps: PipelineDeps = {}) {
   const store = new FactStore();
   let dispute: Dispute;
   try {
-    dispute = await investigate(store, toolkit, c0.disputeId, async (captureId) => {
-      const r = await paypal.getCapture(captureId);
-      return ((r.data as { supplementary_data?: { related_ids?: { order_id?: string } } }).supplementary_data?.related_ids?.order_id as string | undefined) ?? null;
+    dispute = await investigate(store, toolkit, c0.disputeId, {
+      getOrderIdForCapture: async (captureId) => {
+        const r = await paypal.getCapture(captureId);
+        return ((r.data as { supplementary_data?: { related_ids?: { order_id?: string } } }).supplementary_data?.related_ids?.order_id as string | undefined) ?? null;
+      },
+      getTracker: "getTracker" in paypal ? async (tx, tn) => {
+        const r = await (paypal as PayPalClient).getTracker(tx, tn);
+        return { data: r.data, endpoint: r.endpoint };
+      } : undefined,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

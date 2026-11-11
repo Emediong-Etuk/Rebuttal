@@ -9,7 +9,7 @@ import { TOOL_ENDPOINTS, type ReadToolkit, type ReadToolName } from "./toolkit";
 
 export const DEFAULT_MODEL = "claude-opus-5-5";
 /** OpenRouter's name for a Claude model. Check openrouter.ai/models and set OPENROUTER_MODEL to the newest Claude. */
-export const DEFAULT_OPENROUTER_MODEL = "anthropic/claude-sonnet-4.5";
+export const DEFAULT_OPENROUTER_MODEL = "anthropic/claude-opus-5.5";
 
 export type ModelChoice = { provider: "anthropic" | "openrouter"; modelId: string };
 
@@ -117,7 +117,7 @@ export function createClaudeAnalyzer(opts: { model?: LanguageModel; toolkit?: Re
       output: Output.object({ schema: analysisSchema }),
       tools: opts.toolkit && opts.store ? factRecordingTools(opts.toolkit, opts.store) : undefined,
       stopWhen: stepCountIs(6),
-      maxOutputTokens: 16000,
+      maxOutputTokens: Number(process.env.AI_MAX_OUTPUT_TOKENS ?? 6000),
     });
     // Validate again: the schema is the contract, regardless of what the provider did.
     return { analysis: analysisSchema.parse(output), modelId: response.modelId };

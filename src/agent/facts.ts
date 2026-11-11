@@ -59,7 +59,14 @@ export function disputeFacts(store: FactStore, d: Dispute, via?: ReadToolName) {
 }
 
 /** Read-only investigation using PayPal's Agent Toolkit tools. Every result becomes a fact. */
-export async function investigate(store: FactStore, toolkit: ReadToolkit, disputeId: string, getOrderIdForCapture?: (captureId: string) => Promise<string | null>) {
+export type ExtraReads = {
+  getOrderIdForCapture?: (captureId: string) => Promise<string | null>;
+  /** Full tracker record (the toolkit's list view reports status SHIPPED even when the record says DELIVERED). */
+  getTracker?: (transactionId: string, trackingNumber: string) => Promise<{ data: unknown; endpoint: string } | null>;
+};
+
+export async function investigate(store: FactStore, toolkit: ReadToolkit, disputeId: string, extra: ExtraReads = {}) {
+  const { getOrderIdForCapture, getTracker } = extra;
   const call = async (tool: ReadToolName, args: Record<string, unknown>, kind: string) => {
     const r = await toolkit.run(tool, args);
     if (r.ok) {
@@ -90,6 +97,14 @@ export async function investigate(store: FactStore, toolkit: ReadToolkit, disput
       // Record the absence explicitly: "no tracking on file" is itself evidence for a concede verdict.
       store.all[store.all.length - 1]!.kind = "shipment_tracking_none";
     }
+    for (const tr of ((tracking?.trackers ?? []) as Array<{ tracking_number?: string }>).slice(0, 3)) {
+      if (!getTracker || !tr.tracking_number) continue;
+      const detail = await getTracker(txId, tr.tracking_number).catch(() => null);
+      if (detail) {
+        const f = store.add("shipment_tracking_detail", detail.endpoint, trim(detail.data));
+        store.calls.push({ tool: "rest:getTracker", endpoint: detail.endpoint, ok: true, factIds: [f.id] });
+      }
+    }
     await call("list_transactions", { transaction_id: txId, start_date: isoDaysAgo(t.create_time, 1), end_date: isoDaysAgo(t.create_time, -2) }, "transaction");
     if (getOrderIdForCapture) {
       const orderId = await getOrderIdForCapture(txId).catch(() => null);
@@ -107,7 +122,7 @@ function isoDaysAgo(from: string | undefined, days: number): string {
 /** The PayPal-held shipment record to send as PROOF_OF_FULFILLMENT, taken from facts (never from model text). */
 export function trackingFromFacts(facts: FactRecord[]): { carrier_name: string; tracking_number: string; factId: string } | null {
   for (const f of facts) {
-    if (f.kind !== "shipment_tracking") continue;
+    if (f.kind !== "shipment_tracking" && f.kind !== "shipment_tracking_detail") continue;
     type T = { carrier?: string; tracking_number?: string; shipment_direction?: string };
     const data = f.data as { trackers?: T[] } & T;
     const list: T[] = data.trackers ?? [data];
