@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     .limit(30);
   const webhooks = await db.select().from(schema.webhookEvents).orderBy(desc(schema.webhookEvents.receivedAt)).limit(20);
   const audit = await db
-    .select({ at: schema.auditLog.at, actor: schema.auditLog.actor, action: schema.auditLog.action, decision: schema.auditLog.decision, debugId: schema.auditLog.debugId, caseId: schema.auditLog.caseId })
+    .select({ at: schema.auditLog.at, actor: schema.auditLog.actor, action: schema.auditLog.action, decision: schema.auditLog.decision, debugId: schema.auditLog.debugId, caseId: schema.auditLog.caseId, data: schema.auditLog.data })
     .from(schema.auditLog)
     .orderBy(desc(schema.auditLog.id))
     .limit(30);
@@ -28,6 +28,8 @@ export async function GET(req: Request) {
       webhookIdSet: !!process.env.PAYPAL_WEBHOOK_ID,
       telegram: !!process.env.TELEGRAM_BOT_TOKEN,
       appUrl: process.env.APP_URL ?? null,
+      paypalClientIdHint: process.env.PAYPAL_CLIENT_ID ? `${process.env.PAYPAL_CLIENT_ID.slice(0, 6)}… (len ${process.env.PAYPAL_CLIENT_ID.length})` : null,
+      build: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null,
     },
     settings,
     cases,

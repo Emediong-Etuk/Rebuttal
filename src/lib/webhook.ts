@@ -18,7 +18,7 @@ export async function intakeWebhook(
   deps: { db?: DB; paypal: Pick<PayPalClient, "verifyWebhookSignature">; webhookId?: string },
 ): Promise<WebhookIntake> {
   const db = deps.db ?? getDb();
-  const webhookId = deps.webhookId ?? process.env.PAYPAL_WEBHOOK_ID;
+  const webhookId = (deps.webhookId ?? process.env.PAYPAL_WEBHOOK_ID)?.trim();
   if (!webhookId) return { status: 401, reason: "PAYPAL_WEBHOOK_ID is not configured" };
 
   let verified = false;
@@ -31,7 +31,13 @@ export async function intakeWebhook(
     debugId = (e as { debugId?: string }).debugId ?? null;
   }
   if (!verified) {
-    await audit({ actor: "system", action: "webhook_rejected", decision: "INVALID_SIGNATURE", input: rawBody, debugId, data: { transmissionId: headers.get("paypal-transmission-id") } }, db);
+    // Keep what's needed to diagnose a rejection (sandbox data; no secrets: these are PayPal's public signature headers).
+    const sigHeaders = Object.fromEntries(["paypal-auth-algo", "paypal-cert-url", "paypal-transmission-id", "paypal-transmission-sig", "paypal-transmission-time"].map((h) => [h, headers.get(h)]));
+    const wid = webhookId.trim();
+    await audit(
+      { actor: "system", action: "webhook_rejected", decision: "INVALID_SIGNATURE", input: rawBody, debugId, data: { headers: sigHeaders, rawBody: rawBody.slice(0, 20000), webhookIdHint: `${wid.slice(0, 3)}…${wid.slice(-3)} (len ${webhookId.length})` } },
+      db,
+    );
     console.warn(`[webhook] rejected: signature did not verify (transmission ${headers.get("paypal-transmission-id") ?? "?"}, debug ${debugId ?? "-"})`);
     return { status: 401, reason: "signature verification failed" };
   }
