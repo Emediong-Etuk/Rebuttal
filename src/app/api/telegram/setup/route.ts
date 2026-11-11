@@ -24,8 +24,9 @@ export async function POST(req: Request) {
   const chats = (updates.result ?? []).map((u) => u.message?.chat).filter((c): c is { id: number; type: string; first_name?: string } => !!c && c.type === "private");
   const chat = chats.at(-1);
 
+  // Keep the webhook off until we have the chat: while a webhook is set, Telegram delivers /start there instead of queueing it.
+  if (!chat) return NextResponse.json({ ok: false, bot: me.result?.username, webhook: false, error: "No /start message found. Send /start to the bot now, then run setup again." }, { status: 400 });
   const hook = await telegramApi("setWebhook", { url: `${base}/api/telegram`, secret_token: telegramWebhookSecret(), allowed_updates: ["message"] });
-  if (!chat) return NextResponse.json({ ok: false, bot: me.result?.username, webhook: hook.ok, error: "No /start message found. Send /start to the bot, then run setup again." }, { status: 400 });
 
   const chatId = String(chat.id);
   await getDb().insert(schema.settings).values({ id: "default", telegramChatId: chatId }).onConflictDoUpdate({ target: schema.settings.id, set: { telegramChatId: chatId, updatedAt: new Date() } });
