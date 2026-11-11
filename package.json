@@ -1,0 +1,46 @@
+{
+  "name": "rebuttal",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20.9"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start -p ${PORT:-3000}",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:push": "drizzle-kit push",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "seed": "tsx scripts/seed.ts",
+    "cron:deadline": "tsx scripts/cron-deadline.ts",
+    "test:sandbox": "tsx scripts/sandbox-integration.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.102",
+    "@paypal/agent-toolkit": "^1.11.0",
+    "ai": "^7.0.169",
+    "drizzle-orm": "^0.45.4",
+    "next": "^16.4.6",
+    "postgres": "^3.4.9",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.11",
+    "vitest": "^4",
+    "tsx": "^4.23.15",
+    "eslint": "^9",
+    "eslint-config-next": "^16.4.6"
+  }
+}
