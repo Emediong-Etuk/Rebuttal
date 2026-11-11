@@ -13,14 +13,22 @@ Sources checked:
 
 ## Results by spike step
 
+The sandbox app was replaced on 11 Nov: the first app's business account was locked, so checkout
+failed with `PAYEE_ACCOUNT_LOCKED_OR_CLOSED`. The current app is `APP-35D99178M87007202`, linked to
+merchant `42AM6WMA753RC` (`sb-j9owx53830354@business.example.com`).
+
 | # | Step | Result |
 |---|------|--------|
-| 1 | OAuth token | **Works.** `POST /v1/oauth2/token` (client credentials). The token scope includes `disputes/read-seller`, `disputes/update-seller`, `disputes/create`, `applications/webhooks`. Debug `f960463999b09`. |
-| 2 | Create and capture an order | **Create works, capture is blocked on buyer approval.** PayPal-wallet orders need the sandbox buyer to approve in a browser. Card orders (`payment_source.card`, which skip approval) fail with `422 PAYEE_NOT_ENABLED_FOR_CARD_PROCESSING` (debug `ca588a680ff7e`): the sandbox merchant isn't enabled for advanced card processing. Vault-on-success wallet orders are accepted (debug `f82008743c0a6`). Once one buyer approval succeeds, the app can charge the vaulted wallet server-side for any number of demo payments. Buyer approval hasn't succeeded yet: the buyer's login asked for a phone code, which the sandbox never sends. |
-| 3 | Create a dispute by API | **The documented sandbox method exists but is limited for this app.** `POST /v1/customer/disputes` (multipart, `input` JSON part) is sandbox-only. With the documented unsigned `PayPal-Auth-Assertion` (`{"alg":"none"}` header, payload `{iss: <client id>, email: <buyer email>}`) it returns `400 invalid_request: No permissions to set target_client_id` (debug `f871683e57712`). **Without** the assertion the same call validates the request and returns `TRANSACTION_NOT_ELIGIBLE` for a made-up transaction ID (debug `f665257eb5f40`). That suggests it may succeed with a real transaction from the merchant side. Not yet confirmed: there's no real transaction yet (step 2). Manual route: the sandbox buyer files a case in the sandbox Resolution Center. |
-| 4 | Get the dispute to `WAITING_FOR_SELLER_RESPONSE` | **Documented, not yet exercised.** Sandbox-only `POST /v1/customer/disputes/{id}/require-evidence` with `{"action":"SELLER_EVIDENCE"}` moves `UNDER_REVIEW` → `WAITING_FOR_SELLER_RESPONSE`. It's only allowed when the `require-evidence` link is present. `POST .../escalate` moves an `INQUIRY` to a claim. `POST .../adjudicate` with `{"adjudication_outcome":"SELLER_FAVOR"|"BUYER_FAVOR"}` settles an `UNDER_REVIEW` case. The docs say actions take "a few minutes" to appear after creation. |
-| 5 | `provide-evidence` with tracking | **Not yet exercised** (needs a dispute). Shape per docs and spec: multipart; part `input` is JSON `{"evidences":[{"evidence_type":"PROOF_OF_FULFILLMENT","evidence_info":{"tracking_info":[{"carrier_name":"USPS","tracking_number":"..."}]},"notes":"..."}]}`; optional file parts `evidence-file`. Merchant may call it only in `WAITING_FOR_SELLER_RESPONSE` and only when the `provide_evidence` link is present. |
-| 6 | Webhook register and verify | **Not yet exercised.** It needs a public HTTPS URL, which comes with the Render deploy. Listing webhooks works (`GET /v1/notifications/webhooks` → `[]`). Verification is `POST /v1/notifications/verify-webhook-signature` with `auth_algo`, `cert_url`, `transmission_id`, `transmission_sig`, `transmission_time`, `webhook_id`, and the `webhook_event` parsed from the **raw** body. |
+| 1 | OAuth token | **Works.** `POST /v1/oauth2/token` (client credentials). Scope includes `disputes/read-seller`, `disputes/update-seller`, `disputes/create`, `applications/webhooks`, vault. |
+| 2 | Create and capture an order | **Works.** The buyer approved a vault-on-success PayPal-wallet order once. Capture `8RX514794A220173K` (debug `f705770443e11`), vault token `6ws26313fr244171c`. After that, **orders charged to the vaulted wallet complete server-side with no browser**: `95P462672F991615E` $24.00 (debug `f889631532f43`), `4MV93340DD073160E` $18.00, `4KT96773NB9182150` $33.00. Card orders (no approval needed) fail with `PAYEE_NOT_ENABLED_FOR_CARD_PROCESSING` (debug `ca588a680ff7e`). |
+| 3 | Create a dispute | **API: not available. Manual route works.** The sandbox-only `POST /v1/customer/disputes` is refused in every form we tried. With the documented buyer `PayPal-Auth-Assertion` (by email or by payer ID): `400 No permissions to set target_client_id` (debug `f142901a918a7`, `ca58969a20f8e`). Without it: `TRANSACTION_NOT_ELIGIBLE`, using the seller ID (debug `f3222063dd96d`), the real buyer-side ID `65F05326NA2473541` (debug `ca58d31cb3fa7`), or `seller_transaction_id` (debug `ca589699fc90b`). **The buyer filing in the sandbox Resolution Center works**: dispute `PP-R-AXP-10198570` (item not received, $30.00 claimed on the $33.00 payment) appeared in `GET /v1/customer/disputes` about 3 minutes after filing. |
+| 4 | Reach `WAITING_FOR_SELLER_RESPONSE` | **Immediate for item-not-received.** A buyer-filed case arrives as `INQUIRY` / `WAITING_FOR_SELLER_RESPONSE`, with `seller_response_due_date` 20 days out. Links: `escalate`, `make_offer`, `send_message`, `provide_evidence`, `accept_claim`. The `evidences` array contains `{"evidence_type":"PROOF_OF_FULFILLMENT","source":"REQUESTED_FROM_SELLER"}`. `allowed_response_options.accept_claim.accept_claim_types` is `["PARTIAL_REFUND","REFUND"]`. No sandbox `require-evidence` call is needed. The buyer's text is in `messages[].content` (`posted_by: BUYER`) and in the `CREATE` evidence `notes`. |
+| 5 | `provide-evidence` with tracking | **Works.** Multipart, single part `input` (`application/json`): `{"evidences":[{"evidence_type":"PROOF_OF_FULFILLMENT","evidence_info":{"tracking_info":[{"carrier_name":"USPS","tracking_number":"9400111202555842761049"}]},"notes":"..."}]}`, with a `PayPal-Request-Id` header. Response 200 (debug `ca58d32171e1a`), body is just a `detail` link. Re-fetch: status `WAITING_FOR_SELLER_RESPONSE` → **`UNDER_REVIEW`**, links reduced to `self`, evidence recorded as `SUBMITTED_BY_SELLER`. |
+| 6 | Webhook register and verify | **Pending deploy.** It needs a public HTTPS URL (Render). Listing webhooks works. Verification is `POST /v1/notifications/verify-webhook-signature`, built from the `PAYPAL-*` headers plus the event parsed from the raw body. |
+
+Also verified: **Add Tracking**. `POST /v1/shipping/trackers-batch` with
+`{transaction_id, tracking_number, status:"DELIVERED", carrier:"USPS", shipment_date}` returns 200
+(debug `f37764538186b`). `GET /v1/shipping/trackers/{txn}-{tracking}` reads it back.
 
 ## Other confirmed facts
 
@@ -49,15 +57,12 @@ Sources checked:
 
 ## Consequence for "Simulate a dispute" (brief section 9)
 
-Live, API-created disputes are **not available yet**:
-
-- Every route to a disputable transaction needs one successful sandbox-buyer browser login.
-- The buyer-side create-dispute assertion is refused for this app.
-
-**Decision (project owner, 11 Nov): stay live, no replay mode.** The plan:
-
-1. The sandbox buyer approves one vault-on-success order in a browser (use phone code `111111` if asked).
-2. Rebuttal charges the vaulted wallet server-side for each new demo payment.
-3. It creates the dispute with `POST /v1/customer/disputes` from the merchant side, without the assertion.
-   If that is refused, it falls back to a pool of disputes the sandbox buyer pre-filed in the Resolution Center.
-4. The sandbox-only `require-evidence` method moves each dispute to `WAITING_FOR_SELLER_RESPONSE`.
+- **Payments can be created live.** The app charges the vaulted sandbox buyer on demand, with no browser.
+- **Disputes cannot be created live.** The sandbox create-dispute API is refused for this account, and
+  disputes only come from the buyer filing in the Resolution Center.
+- **So "Simulate a dispute" claims one dispute from a pool of real, pre-filed sandbox disputes.** These
+  are filed by the project owner as the sandbox buyer. Each one is real: PayPal holds it, sends its
+  webhooks and accepts its responses.
+- **Pool size limits the demo.** When the pool is empty, the demo page says so plainly; it does not
+  fall back to fake data.
+- **Replay mode is not built** (owner's decision, 11 Nov).
