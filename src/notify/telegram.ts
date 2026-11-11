@@ -1,8 +1,36 @@
+import { createHmac } from "node:crypto";
+import { eq } from "drizzle-orm";
+import { getDb, schema } from "@/db";
 import type { SellerMessage } from "./message";
 
-/** Sends one message to the seller's Telegram chat. A no-op (reported as skipped) when not configured. */
-export async function sendTelegram(msg: SellerMessage, chatId = process.env.TELEGRAM_CHAT_ID): Promise<{ sent: boolean; reason?: string; messageId?: number }> {
+/** The seller's chat: TELEGRAM_CHAT_ID if set, otherwise the one saved by /api/telegram/setup. */
+export async function sellerChatId(): Promise<string | null> {
+  if (process.env.TELEGRAM_CHAT_ID) return process.env.TELEGRAM_CHAT_ID;
+  try {
+    const [s] = await getDb().select().from(schema.settings).where(eq(schema.settings.id, "default"));
+    return s?.telegramChatId ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Secret Telegram echoes on every webhook call. Derived from APPROVAL_SECRET unless set explicitly. */
+export function telegramWebhookSecret(): string {
+  if (process.env.TELEGRAM_WEBHOOK_SECRET) return process.env.TELEGRAM_WEBHOOK_SECRET;
+  return createHmac("sha256", process.env.APPROVAL_SECRET ?? "").update("telegram-webhook").digest("hex").slice(0, 48);
+}
+
+export async function telegramApi<T = unknown>(method: string, body: Record<string, unknown> = {}): Promise<{ ok: boolean; result?: T; description?: string }> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return { ok: false, description: "TELEGRAM_BOT_TOKEN is not set" };
+  const res = await fetch(`https://api.telegram.org/bot${token}/${method}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  return (await res.json()) as { ok: boolean; result?: T; description?: string };
+}
+
+/** Sends one message to the seller's Telegram chat. A no-op (reported as skipped) when not configured. */
+export async function sendTelegram(msg: SellerMessage, chatIdOverride?: string): Promise<{ sent: boolean; reason?: string; messageId?: number }> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = chatIdOverride ?? (token ? await sellerChatId() : null);
   if (!token || !chatId) return { sent: false, reason: "Telegram is not configured" };
   // Telegram refuses inline URL buttons pointing at localhost; fall back to text in that case.
   const usableButton = msg.button && /^https:\/\//.test(msg.button.url) ? msg.button : null;

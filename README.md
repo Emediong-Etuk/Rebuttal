@@ -131,6 +131,20 @@ This registers the PayPal webhook and pulls open disputes into the demo pool. Pu
   4. Add `APP_URL` and `CRON_SECRET` as GitHub Actions secrets. `.github/workflows/deadline-net.yml` then runs the deadline net every 30 minutes.
 - **Render**: `render.yaml` is a Blueprint for a web service, Postgres and a cron job. In Render choose **New → Blueprint**, pick this repo and fill in the secrets.
 
+### Telegram (seller notifications)
+
+1. In Telegram, message **@BotFather** → `/newbot` → copy the token into `TELEGRAM_BOT_TOKEN` and redeploy.
+2. Send `/start` to your new bot.
+3. Run this once:
+
+   ```bash
+   curl -X POST "$APP_URL/api/telegram/setup" -H "Authorization: Bearer $CRON_SECRET"
+   ```
+
+   It saves your chat ID and registers the bot's webhook, so the token never leaves the server.
+
+After that, every case sends you one message with one button. If Rebuttal needs a tracking number, reply with it in plain text (e.g. `USPS 9400111202555842761025`). Without Telegram, the same message and button appear on the case page under "What the seller sees".
+
 ## Project layout
 
 ```

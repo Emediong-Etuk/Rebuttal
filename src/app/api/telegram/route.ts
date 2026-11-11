@@ -1,14 +1,14 @@
 import { timingSafeEqual } from "node:crypto";
 import { after, NextResponse } from "next/server";
 import { latestCaseNeedingInput, sellerProvidedTracking } from "@/agent/pipeline";
-import { parseTrackingReply, sendTelegram } from "@/notify/telegram";
+import { parseTrackingReply, sellerChatId, sendTelegram, telegramWebhookSecret } from "@/notify/telegram";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 function secretOk(given: string | null): boolean {
-  const want = process.env.TELEGRAM_WEBHOOK_SECRET ?? "";
+  const want = telegramWebhookSecret();
   if (!want || !given) return false;
   const a = Buffer.from(given);
   const b = Buffer.from(want);
@@ -22,7 +22,11 @@ export async function POST(req: Request) {
   const chatId = String(update.message?.chat?.id ?? "");
   const text = update.message?.text ?? "";
   // Only the configured seller chat can drive the pipeline.
-  if (!chatId || chatId !== process.env.TELEGRAM_CHAT_ID || !text) return NextResponse.json({ ok: true });
+  if (!chatId || chatId !== (await sellerChatId()) || !text) return NextResponse.json({ ok: true });
+  if (text.trim().startsWith("/start")) {
+    await sendTelegram({ text: "Rebuttal is connected. I'll message you here when a buyer opens a case, with one button to resolve it.", button: null, expectsReply: false });
+    return NextResponse.json({ ok: true });
+  }
 
   after(async () => {
     const parsed = parseTrackingReply(text);
