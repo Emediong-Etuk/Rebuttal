@@ -5,6 +5,7 @@ import { parseTrackingReply, sendTelegram } from "@/notify/telegram";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 function secretOk(given: string | null): boolean {
   const want = process.env.TELEGRAM_WEBHOOK_SECRET ?? "";

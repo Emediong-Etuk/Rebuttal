@@ -6,6 +6,7 @@ import { audit } from "@/lib/record";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 /** Approval links only act on POST (from the confirmation page). GET never reaches here. */
 export async function POST(req: Request) {

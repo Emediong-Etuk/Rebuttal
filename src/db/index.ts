@@ -8,9 +8,10 @@ const globalForDb = globalThis as unknown as { __rebuttalDb?: { db: DB; sql: pos
 
 function connect(url: string) {
   const sql = postgres(url, {
-    max: Number(process.env.DB_POOL_MAX ?? 5),
+    // Serverless (Vercel) functions should hold one connection each; use the pooled connection string.
+    max: Number(process.env.DB_POOL_MAX ?? (process.env.VERCEL ? 1 : 5)),
     // Render Postgres requires TLS on external connections; internal URLs work either way.
-    ssl: /sslmode=require|render\.com/.test(url) ? "require" : undefined,
+    ssl: /sslmode=require|render\.com|neon\.tech/.test(url) ? "require" : undefined,
     onnotice: () => {},
   });
   return { db: drizzle(sql, { schema }), sql };

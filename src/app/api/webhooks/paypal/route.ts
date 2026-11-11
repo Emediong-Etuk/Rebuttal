@@ -5,6 +5,7 @@ import { intakeWebhook, markWebhookProcessed } from "@/lib/webhook";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 export async function POST(req: Request) {
   // Read the body exactly as sent. Re-serialised JSON is a known cause of false verification failures.

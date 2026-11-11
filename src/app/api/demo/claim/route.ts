@@ -6,6 +6,7 @@ import { clientIp, rateLimit } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 /** Claim one real pre-filed sandbox dispute from the demo pool and run the live pipeline on it. */
 export async function POST(req: Request) {
