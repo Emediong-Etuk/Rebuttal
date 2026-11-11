@@ -1,0 +1,86 @@
+# Render Blueprint: web service + Postgres + deadline cron job.
+# Render dashboard > New > Blueprint > pick this repo, then fill in the "sync: false" secrets when asked.
+databases:
+  - name: rebuttal-db
+    databaseName: rebuttal
+    user: rebuttal
+    plan: basic-256mb
+
+services:
+  - type: web
+    name: rebuttal
+    runtime: node
+    plan: starter
+    region: oregon
+    buildCommand: npm ci && npm run build
+    # Migrations run on every start so the schema is always current (works on every plan).
+    startCommand: npm run db:migrate && npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: rebuttal-db
+          property: connectionString
+      - key: PAYPAL_BASE_URL
+        value: https://api-m.sandbox.paypal.com
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-opus-5-5
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        generateValue: true
+      - key: APP_URL
+        sync: false
+      - key: APPROVAL_SECRET
+        generateValue: true
+      - key: CRON_SECRET
+        generateValue: true
+      - key: CONCEDE_CAP
+        value: "100"
+
+  - type: cron
+    name: rebuttal-deadline-net
+    runtime: node
+    plan: starter
+    region: oregon
+    schedule: "*/30 * * * *"
+    buildCommand: npm ci
+    startCommand: npm run cron:deadline
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: rebuttal-db
+          property: connectionString
+      - key: PAYPAL_BASE_URL
+        value: https://api-m.sandbox.paypal.com
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: APPROVAL_SECRET
+        fromService:
+          type: web
+          name: rebuttal
+          envVarKey: APPROVAL_SECRET
