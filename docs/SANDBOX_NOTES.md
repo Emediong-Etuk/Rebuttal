@@ -71,7 +71,13 @@ Also verified: **Add Tracking**. `POST /v1/shipping/trackers-batch` with
 
 - **Some buyer filings became chargebacks.** Disputes on payments whose tracking said `DELIVERED` arrived as
   `dispute_life_cycle_stage: CHARGEBACK`, status `UNDER_REVIEW`, with only a `provide_supporting_info` link.
-  Rebuttal's policy treats them as manual review, as designed. Payments with tracking marked `SHIPPED` are
-  used for scenario A instead.
+  Rebuttal's policy treats them as manual review, as designed. The same happened with tracking marked `SHIPPED`
+  ($26, $27, $36, $37). **Any sandbox payment with tracking on file became a chargeback when the buyer filed.**
+  So scenario A uses a payment with no tracking: the seller supplies it after the case opens. Rebuttal adds it
+  with `POST /v1/shipping/trackers-batch` (including the seller's ship date), re-reads it, and contests.
+  Verified live: provide-evidence 200, debug `ca59910a5eeac`, status → `UNDER_REVIEW`.
+- **Buyer filings were automated for the demo pool.** A headless browser logged in as the sandbox buyer and
+  went through the Resolution Center form at `/resolutioncenter/filing/<buyer transaction id>`. These are real
+  disputes, as if filed by hand.
 - **Item-not-received inquiries arrive ready to answer.** They come in as `INQUIRY` / `WAITING_FOR_SELLER_RESPONSE`,
   with `provide_evidence`, `send_message`, `accept_claim`, `make_offer` and `escalate` links, and a due date 20 days out.

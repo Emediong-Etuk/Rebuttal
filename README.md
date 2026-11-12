@@ -69,11 +69,11 @@ Everything runs against the **PayPal sandbox**. The findings from the initial sp
 
 1. Open **https://rebuttal-eta.vercel.app/demo**.
 2. Pick a scenario:
-   - **A**: the seller shipped and tracking is on file. The agent should contest.
+   - **A**: the seller shipped but never added tracking. The agent asks for it. You reply as the seller (the reply is prefilled), Rebuttal adds the tracking to the PayPal order, and the agent switches to contesting.
    - **B**: nothing was shipped. The agent should recommend a refund.
    - **C**: the buyer's message tells the AI to refund. Watch it get contained.
 3. You claim one **real** dispute filed in the PayPal sandbox. The case page shows the timeline filling in live: facts gathered, Claude's verdict, the ground-check, the policy decision.
-4. Under **What the seller sees** is the same message and button the seller gets in Telegram. Tap it, confirm, and Rebuttal sends the response to PayPal. The timeline shows the PayPal endpoint, the debug ID and the resulting status.
+4. Under **What the seller sees** is the same message and button the seller gets in Telegram. Tap it, confirm, and Rebuttal sends the response to PayPal. The timeline shows the PayPal endpoint, the debug ID and the resulting status. In scenario A, PayPal moves the case to "under review".
 5. Open any step's **Technical details** to see the raw facts, the model output and PayPal debug IDs.
 
 You don't need a PayPal account. **Why a pool of pre-filed disputes?** The PayPal sandbox does not let an app open disputes by API; a sandbox buyer has to file them in the Resolution Center. So the demo keeps real disputes on hold until a visitor claims one. Everything after the claim is live. If a scenario's pool is empty, the page says so.

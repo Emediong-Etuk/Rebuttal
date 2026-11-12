@@ -62,6 +62,7 @@ PayPal is the system of record, and Rebuttal never acts on its own assumptions. 
 ## Challenges we ran into
 
 - **Disputes can't be created by API in the PayPal sandbox.** The documented sandbox create-dispute call is refused for standard developer accounts. We documented every attempt with PayPal debug IDs. So the demo keeps a pool of **real** disputes, filed by a sandbox buyer and held until a visitor claims one. Everything after the claim is live.
+- **Sandbox disputes with tracking become chargebacks.** When a payment already had tracking, the sandbox sent the buyer's "not received" filing straight to a chargeback review. So the "seller shipped" demo is the most common real situation: the seller shipped but never added tracking. Rebuttal asks for the number, the seller replies in one line, Rebuttal adds it to the PayPal order, and the agent contests with that record.
 - **Getting a disputable payment without a browser.** Card processing isn't enabled on default sandbox merchants. We had the sandbox buyer approve one **vaulted** PayPal payment, then charged the vaulted wallet server-side for every demo order.
 - **The toolkit bundles older AI SDK and Zod versions.** We re-wrap its tools for the current AI SDK and fail closed if it ever exposes a non-read tool.
 - **Honest evidence.** Our first live run had tracking added *after* the dispute opened. Claude noticed and refused to contest. That's what we want, and the ground-check makes it structural rather than hoped-for.
