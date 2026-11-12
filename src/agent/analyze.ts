@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { anthropic } from "@ai-sdk/anthropic";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { baseUrl } from "@/lib/site";
 import { generateText, jsonSchema, Output, stepCountIs, tool, type LanguageModel } from "ai";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { analysisSchema, type Analysis, type FactRecord } from "./schema";
@@ -24,7 +25,7 @@ export function getModel(): LanguageModel {
   const choice = modelChoice();
   if (!choice) throw new Error("No AI provider configured: set ANTHROPIC_API_KEY (or OPENROUTER_API_KEY).");
   if (choice.provider === "anthropic") return anthropic(choice.modelId);
-  const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY, appName: "Rebuttal", appUrl: process.env.APP_URL });
+  const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY, appName: "Rebuttal", appUrl: baseUrl() });
   return openrouter.chat(choice.modelId);
 }
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDb, schema } from "@/db";
+import { baseUrl } from "@/lib/site";
 import { sendTelegram, telegramApi, telegramWebhookSecret } from "@/notify/telegram";
 
 export const runtime = "nodejs";
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(req: Request) {
   if (!process.env.CRON_SECRET || req.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) return NextResponse.json({ ok: false }, { status: 401 });
-  const base = (process.env.APP_URL ?? "").replace(/\/$/, "");
+  const base = baseUrl();
   if (!base.startsWith("https://")) return NextResponse.json({ ok: false, error: "APP_URL must be an https URL" }, { status: 400 });
 
   const me = await telegramApi<{ username: string }>("getMe");

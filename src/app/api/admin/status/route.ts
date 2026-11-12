@@ -1,6 +1,7 @@
 import { desc } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { getDb, schema } from "@/db";
+import { baseUrl } from "@/lib/site";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ export async function GET(req: Request) {
       webhookIdSet: !!process.env.PAYPAL_WEBHOOK_ID,
       telegram: !!process.env.TELEGRAM_BOT_TOKEN,
       appUrl: process.env.APP_URL ?? null,
+      linksUse: baseUrl(),
       paypalClientIdHint: process.env.PAYPAL_CLIENT_ID ? `${process.env.PAYPAL_CLIENT_ID.slice(0, 6)}… (len ${process.env.PAYPAL_CLIENT_ID.length})` : null,
       build: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null,
     },

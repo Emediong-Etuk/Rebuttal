@@ -13,3 +13,13 @@ describe("AI provider selection", () => {
     expect(modelChoice({} as unknown as NodeJS.ProcessEnv)).toBeNull();
   });
 });
+
+describe("public base URL", () => {
+  it("uses Vercel's production domain over a mistyped APP_URL", async () => {
+    const { baseUrl } = await import("@/lib/site");
+    const env = (e: Record<string, string>) => e as unknown as NodeJS.ProcessEnv;
+    expect(baseUrl(env({ VERCEL_ENV: "production", VERCEL_PROJECT_PRODUCTION_URL: "rebuttal-eta.vercel.app", APP_URL: "https://wrong.example" }))).toBe("https://rebuttal-eta.vercel.app");
+    expect(baseUrl(env({ APP_URL: "https://x.onrender.com/" }))).toBe("https://x.onrender.com");
+    expect(baseUrl(env({}))).toBe("http://localhost:3000");
+  });
+});

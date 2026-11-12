@@ -6,6 +6,7 @@ import { getPayPal, type PayPalClient } from "@/paypal/client";
 import { buyerClaimText, type Dispute } from "@/paypal/types";
 import { approvalUrl, issueApproval } from "@/lib/approvals";
 import { audit, timeline } from "@/lib/record";
+import { baseUrl } from "@/lib/site";
 import { buildSellerMessage } from "@/notify/message";
 import { sendTelegram } from "@/notify/telegram";
 import { createClaudeAnalyzer, modelLabel, type Analyzer } from "./analyze";
@@ -26,7 +27,7 @@ export type PipelineDeps = {
 };
 
 export function appUrl(path = ""): string {
-  return `${(process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "")}${path}`;
+  return `${baseUrl()}${path}`;
 }
 
 /** Create or refresh the case row from PayPal's dispute. */

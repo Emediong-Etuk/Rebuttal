@@ -2,6 +2,7 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
 import { getDb, schema, type DB } from "@/db";
 import type { ActionKind } from "@/db/schema";
+import { baseUrl } from "./site";
 
 /**
  * Approval links: HMAC-signed, single-use, bound to one case + one action + one draft version,
@@ -80,7 +81,7 @@ export async function consumeApproval(token: string, expected: { caseId: string;
 }
 
 export function approvalUrl(token: string): string {
-  const base = (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  const base = baseUrl();
   return `${base}/approve/${token}`;
 }
 
