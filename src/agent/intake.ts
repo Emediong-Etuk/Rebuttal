@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getDb, schema, type DB } from "@/db";
 import type { Case } from "@/db/schema";
 import { getPayPal, type PayPalClient } from "@/paypal/client";
@@ -130,14 +130,31 @@ export async function syncPool(deps: Deps = {}) {
   return added;
 }
 
-/** Atomically claim one unclaimed pool dispute for a scenario. Concurrent visitors never get the same one. */
+/**
+ * A pool dispute is available if nobody has claimed it, or if a previous visitor claimed it more than
+ * REUSE_AFTER_MINUTES ago and nothing was sent to PayPal (no successful write). Re-claiming re-runs the
+ * pipeline on the same real dispute with a new draft version, which invalidates older approval links.
+ */
+export const REUSE_AFTER_MINUTES = 10;
+const AVAILABLE = sql`
+  pool = true AND paypal_status = 'WAITING_FOR_SELLER_RESPONSE'
+  AND (
+    claimed_at IS NULL
+    OR (
+      claimed_at < now() - make_interval(mins => ${REUSE_AFTER_MINUTES})
+      AND state IN ('AWAITING_SELLER', 'MANUAL_REVIEW', 'NEEDS_INPUT', 'FAILED')
+      AND NOT EXISTS (SELECT 1 FROM actions a WHERE a.case_id = cases.id AND a.status = 'SUCCEEDED')
+    )
+  )`;
+
+/** Atomically claim one available pool dispute for a scenario. Concurrent visitors never get the same one. */
 export async function claimFromPool(scenario: Scenario, db: DB = getDb()): Promise<Case | null> {
   const rows = await db.execute<{ id: string }>(sql`
     UPDATE cases SET claimed_at = now(), updated_at = now()
     WHERE id = (
       SELECT id FROM cases
-      WHERE pool = true AND claimed_at IS NULL AND scenario = ${scenario} AND paypal_status = 'WAITING_FOR_SELLER_RESPONSE'
-      ORDER BY created_at ASC
+      WHERE ${AVAILABLE} AND scenario = ${scenario}
+      ORDER BY claimed_at ASC NULLS FIRST, created_at ASC
       LIMIT 1
       FOR UPDATE SKIP LOCKED
     )
@@ -149,12 +166,8 @@ export async function claimFromPool(scenario: Scenario, db: DB = getDb()): Promi
 }
 
 export async function poolCounts(db: DB = getDb()): Promise<Record<Scenario, number>> {
-  const rows = await db
-    .select({ scenario: schema.cases.scenario, n: sql<number>`count(*)::int` })
-    .from(schema.cases)
-    .where(and(eq(schema.cases.pool, true), isNull(schema.cases.claimedAt), eq(schema.cases.paypalStatus, "WAITING_FOR_SELLER_RESPONSE")))
-    .groupBy(schema.cases.scenario);
+  const rows = (await db.execute(sql`SELECT scenario, count(*)::int AS n FROM cases WHERE ${AVAILABLE} GROUP BY scenario`)) as unknown as Array<{ scenario: string | null; n: number }>;
   const out: Record<Scenario, number> = { A: 0, B: 0, C: 0 };
-  for (const r of rows) if (r.scenario === "A" || r.scenario === "B" || r.scenario === "C") out[r.scenario] = r.n;
+  for (const r of rows) if (r.scenario === "A" || r.scenario === "B" || r.scenario === "C") out[r.scenario] = Number(r.n);
   return out;
 }

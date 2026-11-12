@@ -25,7 +25,7 @@ export async function GET(req: Request) {
   return NextResponse.json({
     ok: true,
     config: {
-      ai: process.env.ANTHROPIC_API_KEY ? "anthropic" : process.env.OPENROUTER_API_KEY ? `openrouter:${process.env.OPENROUTER_MODEL ?? "default"}` : "none",
+      ai: [process.env.ANTHROPIC_API_KEY ? `anthropic(len ${process.env.ANTHROPIC_API_KEY.length}, ${process.env.ANTHROPIC_API_KEY.slice(0, 7)}…)` : null, process.env.OPENROUTER_API_KEY ? `openrouter:${process.env.OPENROUTER_MODEL ?? "default"}` : null].filter(Boolean).join(" + ") || "none",
       webhookIdSet: !!process.env.PAYPAL_WEBHOOK_ID,
       telegram: !!process.env.TELEGRAM_BOT_TOKEN,
       appUrl: process.env.APP_URL ?? null,

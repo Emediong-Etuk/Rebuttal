@@ -25,8 +25,7 @@ export function getModel(): LanguageModel {
   const choice = modelChoice();
   if (!choice) throw new Error("No AI provider configured: set ANTHROPIC_API_KEY (or OPENROUTER_API_KEY).");
   if (choice.provider === "anthropic") return anthropic(choice.modelId);
-  const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY, appName: "Rebuttal", appUrl: baseUrl() });
-  return openrouter.chat(choice.modelId);
+  return openRouterModel();
 }
 
 export function modelLabel(): string {
@@ -107,9 +106,20 @@ function factRecordingTools(toolkit: ReadToolkit, store: FactStore) {
   };
 }
 
+function openRouterModel(): LanguageModel {
+  const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY, appName: "Rebuttal", appUrl: baseUrl() });
+  return openrouter.chat(process.env.OPENROUTER_MODEL || DEFAULT_OPENROUTER_MODEL);
+}
+
+/** True for errors that mean "this provider's key is unusable", where trying the other provider makes sense. */
+export function isProviderAuthError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  const status = (e as { statusCode?: number })?.statusCode;
+  return status === 401 || status === 403 || /x-api-key|api key|authentication|credit balance|insufficient/i.test(msg);
+}
+
 export function createClaudeAnalyzer(opts: { model?: LanguageModel; toolkit?: ReadToolkit; store?: FactStore } = {}): Analyzer {
-  return async (input) => {
-    const model = opts.model ?? getModel();
+  const run = async (model: LanguageModel, input: AnalyzeInput) => {
     const nonce = randomBytes(6).toString("hex");
     const { output, response } = await generateText({
       model,
@@ -122,6 +132,19 @@ export function createClaudeAnalyzer(opts: { model?: LanguageModel; toolkit?: Re
     });
     // Validate again: the schema is the contract, regardless of what the provider did.
     return { analysis: analysisSchema.parse(output), modelId: response.modelId };
+  };
+  return async (input) => {
+    const primary = opts.model ?? getModel();
+    try {
+      return await run(primary, input);
+    } catch (e) {
+      // Anthropic key rejected but an OpenRouter key exists: same Claude family, other route.
+      if (!opts.model && modelChoice()?.provider === "anthropic" && process.env.OPENROUTER_API_KEY && isProviderAuthError(e)) {
+        const r = await run(openRouterModel(), input);
+        return { ...r, modelId: `${r.modelId} (OpenRouter fallback: Anthropic key rejected)` };
+      }
+      throw e;
+    }
   };
 }
 
