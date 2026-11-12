@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eq, like } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getDb, schema, type DB } from "@/db";
 import type { ActionKind, Case } from "@/db/schema";
 import { getPayPal, type PayPalClient } from "@/paypal/client";
@@ -257,8 +257,13 @@ export async function sellerProvidedTracking(
   return runPipeline(caseId, deps);
 }
 
+/** A seller may answer with tracking when Rebuttal asked for it, or instead of approving a refund. */
+export function acceptsTrackingReply(c: Pick<Case, "state" | "policy">): boolean {
+  return c.state === "NEEDS_INPUT" || (c.state === "AWAITING_SELLER" && (c.policy as { action?: string } | null)?.action === "ACCEPT_CLAIM");
+}
+
 /** Most recent case waiting for seller input (Telegram replies are matched to it). */
 export async function latestCaseNeedingInput(db: DB = getDb()) {
-  const rows = await db.select().from(schema.cases).where(like(schema.cases.state, "NEEDS_INPUT"));
+  const rows = (await db.select().from(schema.cases)).filter((c) => acceptsTrackingReply(c));
   return rows.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())[0] ?? null;
 }

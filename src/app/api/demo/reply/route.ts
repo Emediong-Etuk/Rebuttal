@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { after, NextResponse } from "next/server";
-import { sellerProvidedTracking } from "@/agent/pipeline";
+import { acceptsTrackingReply, sellerProvidedTracking } from "@/agent/pipeline";
 import { getDb, schema } from "@/db";
 import { clientIp, rateLimit } from "@/lib/rateLimit";
 import { parseTrackingReply } from "@/notify/telegram";
@@ -20,7 +20,7 @@ export async function POST(req: Request) {
   const back = (q: string) => NextResponse.redirect(new URL(`/cases/${caseId}?${q}`, req.url), 303);
   const [c] = await getDb().select().from(schema.cases).where(eq(schema.cases.id, caseId));
   if (!c || !c.pool || !c.claimedAt) return NextResponse.json({ ok: false }, { status: 404 });
-  if (c.state !== "NEEDS_INPUT") return back(`notice=${encodeURIComponent("This case isn't waiting for a reply right now.")}`);
+  if (!acceptsTrackingReply(c)) return back(`notice=${encodeURIComponent("This case isn't waiting for a reply right now.")}`);
   const rl = await rateLimit(`reply:${clientIp(req.headers)}`, 5, 3600);
   if (!rl.ok) return back(`notice=${encodeURIComponent("Too many replies from you in the last hour. Please try again later.")}`);
   const parsed = parseTrackingReply(reply);

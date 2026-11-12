@@ -61,13 +61,13 @@ export function buildSellerMessage(input: {
       };
     case "ACCEPT_CLAIM":
       return {
-        text: `${head}${why}\n\nMy recommendation: refund the buyer (${amt}). There's no shipping record I can use to fight this.\n⏳ ${left}. I will never refund without your approval.${d.approval === "TYPED_AMOUNT" ? `\nThis is above your one-tap limit, so you'll be asked to type the amount.` : ""}`,
+        text: `${head}${why}\n\nMy recommendation: refund the buyer (${amt}). There's no shipping record I can use to fight this.\nShipped it after all? Reply with the tracking number and I'll fight it instead.\n⏳ ${left}. I will never refund without your approval.${d.approval === "TYPED_AMOUNT" ? `\nThis is above your one-tap limit, so you'll be asked to type the amount.` : ""}`,
         button: input.approvalLink ? { label: `Refund ${amt}`, url: input.approvalLink } : null,
         expectsReply: false,
       };
     case "ASK_SELLER":
       return {
-        text: `${head}${why}\n\nI need one thing to fight this: ${(input.missing?.length ? input.missing.join("; ") : "the tracking number for this order")}.\nReply to this message with it (for example: USPS 9400111202555842761025) and I'll take it from there.\n⏳ ${left}.`,
+        text: `${head}${why}\n\nI need one thing to fight this:\n${(input.missing?.length ? input.missing : ["The tracking number for this order"]).map((m) => `• ${m.replace(/[.;\s]+$/, "")}`).join("\n")}\nReply to this message with it (for example: USPS 9400111202555842761025) and I'll take it from there.\n⏳ ${left}.`,
         button: { label: "Open the case", url: input.caseLink },
         expectsReply: true,
       };

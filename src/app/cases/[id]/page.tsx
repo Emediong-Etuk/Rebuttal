@@ -5,6 +5,7 @@ import AutoRefresh from "@/components/AutoRefresh";
 import { getDb, schema } from "@/db";
 import type { CaseState } from "@/db/schema";
 import { STATE_LABEL } from "@/lib/labels";
+import { acceptsTrackingReply } from "@/agent/pipeline";
 import { money, timeLeft } from "@/notify/message";
 import type { SellerMessage } from "@/notify/message";
 
@@ -63,9 +64,9 @@ export default async function CasePage({ params, searchParams }: { params: Promi
           {message.expectsReply && <p className="small muted">In Telegram the seller replies with the tracking number in plain text.</p>}
         </div>
       ) : null}
-      {message && c.state === "NEEDS_INPUT" && c.pool && c.claimedAt ? (
+      {message && acceptsTrackingReply(c) && c.pool && c.claimedAt ? (
         <form action="/api/demo/reply" method="post" className="card stack" style={{ marginTop: 12 }}>
-          <strong>Reply as the seller</strong>
+          <strong>{c.state === "NEEDS_INPUT" ? "Reply as the seller" : "Or reply as a seller who did ship it"}</strong>
           <span className="small muted">
             You&apos;re playing the seller who shipped the order but never added tracking. This sample reply is what they would send the bot. Rebuttal adds it to the PayPal order, then
             re-checks the case.
