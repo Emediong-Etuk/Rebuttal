@@ -14,8 +14,12 @@ export type ApprovalPayload = { jti: string; c: string; a: ActionKind; v: number
 
 function secret(): string {
   const s = process.env.APPROVAL_SECRET;
-  if (!s || s.length < 32) throw new Error("APPROVAL_SECRET must be set (32+ characters)");
-  return s;
+  if (s && s.length >= 32) return s;
+  // Fallback: a key derived from CRON_SECRET (never the same bytes). Tokens must also exist in the database,
+  // so a leaked key alone cannot mint a working link. Set APPROVAL_SECRET to use a dedicated key.
+  const c = process.env.CRON_SECRET;
+  if (c && c.length >= 32) return createHmac("sha256", c).update("rebuttal-approval-links").digest("hex");
+  throw new Error("APPROVAL_SECRET must be set (32+ characters)");
 }
 
 const b64 = (b: Buffer | string) => Buffer.from(b).toString("base64url");
