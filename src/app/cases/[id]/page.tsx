@@ -10,6 +10,13 @@ import type { SellerMessage } from "@/notify/message";
 
 export const dynamic = "force-dynamic";
 
+/** A plausible sample reply for the demo: USPS-format number, shipped two days before the case was opened. */
+function sampleReply(opened: Date): string {
+  const shipped = new Date(opened.getTime() - 2 * 86_400_000).toISOString().slice(0, 10);
+  const digits = String(Math.floor(opened.getTime() / 1000)).slice(-8);
+  return `USPS 94001112025558${digits} shipped ${shipped}`;
+}
+
 const ACTOR: Record<string, string> = { paypal: "PayPal", agent: "Agent", model: "Claude", system: "Rebuttal", policy: "Policy engine", seller: "Seller", cron: "Deadline net" };
 
 export default async function CasePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | undefined>> }) {
@@ -55,9 +62,22 @@ export default async function CasePage({ params, searchParams }: { params: Promi
           )}
           {message.expectsReply && <p className="small muted">In Telegram the seller replies with the tracking number in plain text.</p>}
         </div>
-      ) : (
-        <div className="card muted">The agent is reading the case. This usually takes 20–40 seconds.</div>
-      )}
+      ) : null}
+      {message && c.state === "NEEDS_INPUT" && c.pool && c.claimedAt ? (
+        <form action="/api/demo/reply" method="post" className="card stack" style={{ marginTop: 12 }}>
+          <strong>Reply as the seller</strong>
+          <span className="small muted">
+            You&apos;re playing the seller who shipped the order but never added tracking. This sample reply is what they would send the bot. Rebuttal adds it to the PayPal order, then
+            re-checks the case.
+          </span>
+          <input type="hidden" name="caseId" value={c.id} />
+          <input className="amount" name="reply" defaultValue={sampleReply(c.createdAt)} />
+          <button className="btn btn-primary btn-block" type="submit">
+            Send reply
+          </button>
+        </form>
+      ) : null}
+      {!message && <div className="card muted">The agent is reading the case. This usually takes 20–40 seconds.</div>}
 
       <h2>Timeline</h2>
       <ol className="timeline">

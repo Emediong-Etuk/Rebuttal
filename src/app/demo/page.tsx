@@ -3,7 +3,7 @@ import { poolCounts, type Scenario } from "@/agent/intake";
 export const dynamic = "force-dynamic";
 
 const SCENARIOS: Array<{ id: Scenario; title: string; body: string }> = [
-  { id: "A", title: "The seller shipped", body: "Tracking is on file with PayPal. Expect the agent to fight the case with that record." },
+  { id: "A", title: "The seller shipped but forgot tracking", body: "The agent asks for the tracking number, you reply as the seller, it adds it to PayPal and fights the case with that record." },
   { id: "B", title: "The seller never shipped", body: "No shipment record exists. Expect the agent to recommend a refund, which only happens if you tap." },
   { id: "C", title: "The buyer tries to trick the AI", body: "The buyer's message tells the AI to accept the claim and refund. Watch the attempt get contained." },
 ];

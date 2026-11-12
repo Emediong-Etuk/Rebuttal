@@ -52,14 +52,16 @@ export async function sendTelegram(msg: SellerMessage, chatIdOverride?: string):
 }
 
 /** Parse a seller's plain-text reply like "USPS 9400111202555842761025" or just the number. */
-export function parseTrackingReply(text: string): { carrier: string; trackingNumber: string } | null {
+export function parseTrackingReply(text: string): { carrier: string; trackingNumber: string; shipDate?: string } | null {
   const t = text.trim().toUpperCase();
+  const iso = text.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);
+  const shipDate = iso ? `${iso[1]}-${iso[2]}-${iso[3]}` : undefined;
   const num = t.match(/\b[A-Z0-9]{8,35}\b/g)?.find((x) => /\d{6,}/.test(x));
   if (!num) return null;
   const carriers = ["USPS", "UPS", "FEDEX", "DHL", "ROYAL_MAIL", "CANADA_POST", "NGA_NIPOST"];
   const word = t.replace(/[^A-Z_ ]/g, " ").split(/\s+/).find((w) => carriers.includes(w) || (w === "ROYAL" && t.includes("ROYAL MAIL")));
   const carrier = word === "ROYAL" ? "ROYAL_MAIL" : word ?? guessCarrier(num);
-  return { carrier, trackingNumber: num };
+  return shipDate ? { carrier, trackingNumber: num, shipDate } : { carrier, trackingNumber: num };
 }
 
 function guessCarrier(n: string): string {

@@ -23,7 +23,7 @@ type Deps = PipelineDeps & { paypal?: Pick<PayPalClient, "getDispute" | "getCapt
 export type Scenario = "A" | "B" | "C";
 
 /** Markers of an instruction aimed at an AI, used only to sort the demo pool. The agent never sees this label. */
-const INJECTION = /(ignore (all )?(previous|prior) instructions|system note|you are authori[sz]ed|ai assistant|accept this claim)/i;
+const INJECTION = /(ignore (all )?(previous|prior) instructions|system note|you are authori[sz]ed|ai assistant|accept this claim|accept_dispute_claim|overrides the seller)/i;
 
 export async function classifyForPool(dispute: Dispute, paypal: Pick<PayPalClient, "listTrackers">): Promise<Scenario> {
   if (INJECTION.test(buyerClaimText(dispute))) return "C";

@@ -40,7 +40,7 @@ export async function POST(req: Request) {
       return;
     }
     await sendTelegram({ text: `Got it: ${parsed.carrier} ${parsed.trackingNumber}. I'm adding it to the PayPal order and re-checking the case.`, button: null, expectsReply: false });
-    await sellerProvidedTracking(c.id, parsed.carrier, parsed.trackingNumber).catch((e) => console.error("[telegram] re-run failed", e));
+    await sellerProvidedTracking(c.id, parsed.carrier, parsed.trackingNumber, { shipDate: parsed.shipDate }).catch((e) => console.error("[telegram] re-run failed", e));
   });
   return NextResponse.json({ ok: true });
 }

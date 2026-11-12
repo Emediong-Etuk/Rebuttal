@@ -233,21 +233,21 @@ export async function sellerProvidedTracking(
   caseId: string,
   carrier: string,
   trackingNumber: string,
-  deps: PipelineDeps & { tracker?: Pick<PayPalClient, "addTracking"> } = {},
+  deps: PipelineDeps & { tracker?: Pick<PayPalClient, "addTracking">; shipDate?: string } = {},
 ) {
   const db = deps.db ?? getDb();
   const facts = await loadFacts(caseId, db);
   const disputeFact = facts.find((f) => f.kind === "dispute")?.data as { disputed_transactions?: Array<{ seller_transaction_id?: string }> } | undefined;
   const txId = disputeFact?.disputed_transactions?.[0]?.seller_transaction_id;
-  await timeline({ caseId, kind: "seller_input", actor: "seller", title: "Seller replied with a tracking number", body: `${carrier} ${trackingNumber}` }, db);
-  await audit({ caseId, actor: "seller", action: "supply_tracking", input: { carrier, trackingNumber } }, db);
+  await timeline({ caseId, kind: "seller_input", actor: "seller", title: "Seller replied with a tracking number", body: `${carrier} ${trackingNumber}${deps.shipDate ? `, shipped ${deps.shipDate}` : ""}` }, db);
+  await audit({ caseId, actor: "seller", action: "supply_tracking", input: { carrier, trackingNumber, shipDate: deps.shipDate ?? null } }, db);
   if (!txId) {
     await timeline({ caseId, kind: "error", actor: "system", title: "Could not attach tracking", body: "The disputed transaction ID is unknown. Open the case in PayPal and add tracking there." }, db);
     return null;
   }
   const tracker = deps.tracker ?? getPayPal();
   try {
-    const r = await tracker.addTracking({ transactionId: txId, trackingNumber, carrier, status: "SHIPPED" });
+    const r = await tracker.addTracking({ transactionId: txId, trackingNumber, carrier, status: "SHIPPED", shipmentDate: deps.shipDate });
     await timeline({ caseId, kind: "action", actor: "seller", title: "Tracking added to the PayPal transaction", body: `${carrier} ${trackingNumber} on ${txId}`, endpoint: r.endpoint, debugId: r.debugId }, db);
   } catch (e) {
     const err = e as { message?: string; debugId?: string; endpoint?: string };
