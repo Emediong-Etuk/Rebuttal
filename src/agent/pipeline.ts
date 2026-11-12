@@ -195,7 +195,12 @@ export async function runPipeline(caseId: string, deps: PipelineDeps = {}) {
   // 5. Notify the seller: one message, one primary button.
   let link: string | null = null;
   if (decision.action === "PROVIDE_EVIDENCE" || decision.action === "SEND_MESSAGE" || decision.action === "ACCEPT_CLAIM") {
-    link = approvalUrl(await issueApproval(caseId, decision.action as ActionKind, draftVersion, db));
+    try {
+      link = approvalUrl(await issueApproval(caseId, decision.action as ActionKind, draftVersion, db));
+    } catch (e) {
+      // Without a signed link the seller can't approve; say so instead of failing silently.
+      await timeline({ caseId, kind: "error", actor: "system", title: "Could not create the approval button", body: `${e instanceof Error ? e.message : String(e)}. The seller can still respond in the PayPal Resolution Center.` }, db);
+    }
   }
   const msg = buildSellerMessage({
     amount: c.amountValue,

@@ -28,6 +28,8 @@ export async function GET(req: Request) {
       ai: [process.env.ANTHROPIC_API_KEY ? `anthropic(len ${process.env.ANTHROPIC_API_KEY.length}, ${process.env.ANTHROPIC_API_KEY.slice(0, 7)}…)` : null, process.env.OPENROUTER_API_KEY ? `openrouter:${process.env.OPENROUTER_MODEL ?? "default"}` : null].filter(Boolean).join(" + ") || "none",
       webhookIdSet: !!process.env.PAYPAL_WEBHOOK_ID,
       telegram: !!process.env.TELEGRAM_BOT_TOKEN,
+      approvalSecret: process.env.APPROVAL_SECRET ? `set (len ${process.env.APPROVAL_SECRET.length})` : "MISSING",
+      cronSecret: !!process.env.CRON_SECRET,
       appUrl: process.env.APP_URL ?? null,
       linksUse: baseUrl(),
       paypalClientIdHint: process.env.PAYPAL_CLIENT_ID ? `${process.env.PAYPAL_CLIENT_ID.slice(0, 6)}… (len ${process.env.PAYPAL_CLIENT_ID.length})` : null,
