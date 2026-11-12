@@ -24,7 +24,7 @@ merchant `42AM6WMA753RC` (`sb-j9owx53830354@business.example.com`).
 | 3 | Create a dispute | **API: not available. Manual route works.** The sandbox-only `POST /v1/customer/disputes` is refused in every form we tried. With the documented buyer `PayPal-Auth-Assertion` (by email or by payer ID): `400 No permissions to set target_client_id` (debug `f142901a918a7`, `ca58969a20f8e`). Without it: `TRANSACTION_NOT_ELIGIBLE`, using the seller ID (debug `f3222063dd96d`), the real buyer-side ID `65F05326NA2473541` (debug `ca58d31cb3fa7`), or `seller_transaction_id` (debug `ca589699fc90b`). **The buyer filing in the sandbox Resolution Center works**: dispute `PP-R-AXP-10198570` (item not received, $30.00 claimed on the $33.00 payment) appeared in `GET /v1/customer/disputes` about 3 minutes after filing. |
 | 4 | Reach `WAITING_FOR_SELLER_RESPONSE` | **Immediate for item-not-received.** A buyer-filed case arrives as `INQUIRY` / `WAITING_FOR_SELLER_RESPONSE`, with `seller_response_due_date` 20 days out. Links: `escalate`, `make_offer`, `send_message`, `provide_evidence`, `accept_claim`. The `evidences` array contains `{"evidence_type":"PROOF_OF_FULFILLMENT","source":"REQUESTED_FROM_SELLER"}`. `allowed_response_options.accept_claim.accept_claim_types` is `["PARTIAL_REFUND","REFUND"]`. No sandbox `require-evidence` call is needed. The buyer's text is in `messages[].content` (`posted_by: BUYER`) and in the `CREATE` evidence `notes`. |
 | 5 | `provide-evidence` with tracking | **Works.** Multipart, single part `input` (`application/json`): `{"evidences":[{"evidence_type":"PROOF_OF_FULFILLMENT","evidence_info":{"tracking_info":[{"carrier_name":"USPS","tracking_number":"9400111202555842761049"}]},"notes":"..."}]}`, with a `PayPal-Request-Id` header. Response 200 (debug `ca58d32171e1a`), body is just a `detail` link. Re-fetch: status `WAITING_FOR_SELLER_RESPONSE` → **`UNDER_REVIEW`**, links reduced to `self`, evidence recorded as `SUBMITTED_BY_SELLER`. |
-| 6 | Webhook register and verify | **Pending deploy.** It needs a public HTTPS URL (Render). Listing webhooks works. Verification is `POST /v1/notifications/verify-webhook-signature`, built from the `PAYPAL-*` headers plus the event parsed from the raw body. |
+| 6 | Webhook register and verify | **Works.** Registered by API: `POST /v1/notifications/webhooks` → webhook `82T468282C6122132` for `https://rebuttal-eta.vercel.app/api/webhooks/paypal` (debug `f70649491805e`). Real `CUSTOMER.DISPUTE.CREATED` deliveries verify with `POST /v1/notifications/verify-webhook-signature` → `SUCCESS` (debug `f3946736db5ae`) and were processed into cases. Two lessons: (a) the first deliveries were rejected because the deployed app had a wrong client secret, so the verify call itself failed (`invalid_client`); rejections now record `VERIFY_ERROR` separately from `INVALID_SIGNATURE`. (b) The event is embedded byte-for-byte from the raw body. `POST /v1/notifications/webhooks-events/{id}/resend` re-delivers an event, which is useful for recovery. |
 
 Also verified: **Add Tracking**. `POST /v1/shipping/trackers-batch` with
 `{transaction_id, tracking_number, status:"DELIVERED", carrier:"USPS", shipment_date}` returns 200
@@ -66,3 +66,12 @@ Also verified: **Add Tracking**. `POST /v1/shipping/trackers-batch` with
 - **Pool size limits the demo.** When the pool is empty, the demo page says so plainly; it does not
   fall back to fake data.
 - **Replay mode is not built** (owner's decision, 11 Nov).
+
+## Later findings (12 Nov)
+
+- **Some buyer filings became chargebacks.** Disputes on payments whose tracking said `DELIVERED` arrived as
+  `dispute_life_cycle_stage: CHARGEBACK`, status `UNDER_REVIEW`, with only a `provide_supporting_info` link.
+  Rebuttal's policy treats them as manual review, as designed. Payments with tracking marked `SHIPPED` are
+  used for scenario A instead.
+- **Item-not-received inquiries arrive ready to answer.** They come in as `INQUIRY` / `WAITING_FOR_SELLER_RESPONSE`,
+  with `provide_evidence`, `send_message`, `accept_claim`, `make_offer` and `escalate` links, and a due date 20 days out.
